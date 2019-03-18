@@ -32,14 +32,14 @@ class CykParser(object):
             if start2 == length2 == 0:
                 return bracketed_expression + ' ' + original_sentence[start1] + ')'
             else:
-                return bracketed_expression + self.bracketed_from_cyk(cyk_table, length1, start1, rule.expansion[0]) + \
-                         self.bracketed_from_cyk(cyk_table, length2, start2, rule.expansion[1]) + ')'
+                return bracketed_expression + self.bracketed_from_cyk(cyk_table, length1, start1, rule.expansion[0], original_sentence) + \
+                         self.bracketed_from_cyk(cyk_table, length2, start2, rule.expansion[1], original_sentence) + ')'
         else:
             if start2 == length2 == 0:
                 return original_sentence[start1]
             else:
-                return self.bracketed_from_cyk(cyk_table, length1, start1, rule.expansion[0]) +\
-                       self.bracketed_from_cyk(cyk_table, length2, start2, rule.expansion[1])
+                return self.bracketed_from_cyk(cyk_table, length1, start1, rule.expansion[0], original_sentence) +\
+                       self.bracketed_from_cyk(cyk_table, length2, start2, rule.expansion[1], original_sentence)
 
     def parse_sentence(self, sentence):
         """ Returns a parsed expression of the input sentence
