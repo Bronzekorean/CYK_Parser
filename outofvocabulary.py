@@ -56,6 +56,10 @@ class OOVhandler(object):
         print('Keeping only common words that have embeddings')
         self.embedded_terminals = [terminal for terminal in self.terminals if terminal in words]
 
+        self.transformed_embeddings = np.array([self.embeddings[self.word_id[w]] for w in self.embedded_terminals])
+        self.transformed_embeddings = self.transformed_embeddings.T / \
+                                      (np.sum(self.transformed_embeddings ** 2, axis=1) ** 0.5)
+
     def closer_levenshtein(self, word):
         """
         returns the closest word in the word embedding using the levenshtein distance
@@ -106,9 +110,7 @@ class OOVhandler(object):
         e = self.embeddings[self.word_id[word]]
         # normalise e and the embedding matrix
         e = e / np.linalg.norm(e)
-        transformed_embeddings = np.array([self.embeddings[self.word_id[w]] for w in self.embedded_terminals])
-        transformed_embeddings = transformed_embeddings.T / (np.sum(transformed_embeddings ** 2, axis=1) ** 0.5)
-        distances = e @ transformed_embeddings
+        distances = e @ self.transformed_embeddings
         return self.embedded_terminals[max(enumerate(distances), key=itemgetter(1))[0]]
 
     def replace(self, oov_word):

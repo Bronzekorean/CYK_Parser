@@ -6,30 +6,21 @@ class Gsymbol(object):
     """ implements a grammatical symbol used for cfg
     hash and equality operators are needed to create symbol set and probability map"""
 
-    TYPES = ('Terminal', 'Non_Terminal')
-
-    def __init__(self, symb, stype):
+    def __init__(self, symb, isterminal):
         self.symb = symb
-        if stype not in self.TYPES:
-            raise Exception(str(stype) + ' is not a grammatical symbol type')
-        else:
-            self.stype = stype
-
-    def isterminal(self):
-
-        return self.stype == self.TYPES[0]
+        self.isterminal = isterminal
 
     def __eq__(self, other):
-        return self.symb == other.symb and self.stype == other.stype
+        return self.symb == other.symb and self.isterminal == other.isterminal
 
     def __lt__(self, other):
-        return (self.stype, self.symb) < (other.stype, other.symb)
+        return (self.isterminal, self.symb) < (other.isterminal, other.symb)
 
     def __hash__(self):
-        return hash((self.stype, self.symb))
+        return hash((self.isterminal, self.symb))
 
     def __repr__(self):
-        return self.symb + ' ' + self.stype
+        return self.symb + ' ' + ('Terminal' if self.isterminal else 'Non_Terminal')
 
 
 class Grule(object):
@@ -37,7 +28,7 @@ class Grule(object):
         hash and equality operators are needed to create symbol set and probability map"""
 
     def __init__(self, gsymb, expansion):
-        if not isinstance(gsymb, Gsymbol) or gsymb.isterminal():
+        if not isinstance(gsymb, Gsymbol) or gsymb.isterminal:
             raise Exception('Wrong input grammatical symbol')
         else:
             self.gsymb = gsymb
@@ -45,7 +36,7 @@ class Grule(object):
 
     def __eq__(self, other):
         if not isinstance(other, Grule):
-            raise Exception('Cannot compare gramatical rule to object of type' + str(type(other)))
+            raise Exception('Cannot compare grammatical rule to object of type' + str(type(other)))
         else:
             return self.gsymb == other.gsymb and self.expansion == other.expansion
 
@@ -59,20 +50,23 @@ class Grule(object):
         return self.gsymb.symb + ' -> ' + ', '.join([symbol.symb for symbol in self.expansion])
 
     def is_chomsky_normal_form(self):
-        """ Returns
+        """
+        Used only to make sure the resulting pcfg is in CNF
+        
+        Returns
             ----------
             bool: True if the rule is in chomsky normal form
         """
-        if len(self.expansion) == 1 and self.expansion[0].isterminal():
+        if len(self.expansion) == 1 and self.expansion[0].isterminal:
             return True
-        elif len(self.expansion) == 2 and not self.expansion[0].isterminal() and \
-                not self.expansion[1].isterminal():
+        elif len(self.expansion) == 2 and not self.expansion[0].isterminal and \
+                not self.expansion[1].isterminal:
             return True
         else:
             return False
 
     def is_unit_rule(self):
-        return len(self.expansion) == 1 and not self.expansion[0].isterminal()
+        return len(self.expansion) == 1 and not self.expansion[0].isterminal
 
     def copy(self):
         return Grule(self.gsymb, self.expansion)
@@ -81,9 +75,9 @@ class Grule(object):
 def gsymb_from_string(symb):
     if '(' in symb:
         symb = symb.split('-')[0]  # remove hyphen from NT symbols
-        return Gsymbol(symb.replace('(', ''), 'Non_Terminal')
+        return Gsymbol(symb.replace('(', ''), False)
     else:
-        return Gsymbol(symb.replace(')', ''), 'Terminal')
+        return Gsymbol(symb.replace(')', ''), True)
 
 
 def level_list(line):
@@ -99,52 +93,45 @@ def level_list(line):
     return lvl_list
 
 
-def remove_unit_rule(l_gtrans):
+def remove_unit_rule(rule_list):
     """
         remove_nt_to_nt
-        Maps transitions A->B->C->...Z to A->Z, B->Z, C->Z (with Z terminal
-        or non-terminal with cardinal > 1)
+         A->B, B->C, C->D (D != NT)
 
-        Parameters
-        ----------
-        l_gtrans: list(Grule).
-            Initial list of transitions (with multiplicities).
+         and replace with: A
 
-        Returns
-        ----------
-        l_gtrans2: list(Grule).
-            Result list of transitions (with multiplicities).
+         Returns:
+             new rule_list with no
     """
 
-    l_gtrans2 = list()
+    new_rule_list = list()
     map_nt_to_nt = {}
 
     # For each Grule
-    for gtrans in l_gtrans:
-        new_expansion = gtrans.expansion
-        while len(new_expansion) == 1 and not new_expansion[0].isterminal():
+    for rule in rule_list:
+        new_expansion = rule.expansion
+        while len(new_expansion) == 1 and not new_expansion[0].isterminal:
             # Dig until find a terminal or more than 2 non-terminals
-            for gtrans2 in l_gtrans:
-                if gtrans2.gsymb == new_expansion[0]:
-                    if gtrans2.gsymb not in map_nt_to_nt.keys():
-                        map_nt_to_nt[gtrans2.gsymb] = set()
-                    map_nt_to_nt[gtrans2.gsymb].add(gtrans.gsymb)
-                    new_expansion = gtrans2.expansion
+            for rule2 in rule_list:
+                if rule2.gsymb == new_expansion[0]:
+                    if rule2.gsymb not in map_nt_to_nt.keys():
+                        map_nt_to_nt[rule2.gsymb] = set()
+                    map_nt_to_nt[rule2.gsymb].add(rule.gsymb)
+                    new_expansion = rule2.expansion
                     break
-        l_gtrans2.append(Grule(gtrans.gsymb, new_expansion))
+        new_rule_list.append(Grule(rule.gsymb, new_expansion))
 
-    # Append all missing Grules
+    # Append all missing Grammatical rules
     # Initial length of the list
-    n_init = len(l_gtrans2)
+    n_init = len(new_rule_list)
     for i in range(n_init):
-        symbol_to_map = l_gtrans2[i].gsymb
+        symbol_to_map = new_rule_list[i].gsymb
         if symbol_to_map in map_nt_to_nt:
             for gsymb in map_nt_to_nt[symbol_to_map]:
-                l_gtrans2.append(Grule(gsymb, l_gtrans2[i].expansion))
+                new_rule_list.append(Grule(gsymb, new_rule_list[i].expansion))
 
+    return new_rule_list
 
-
-    return l_gtrans2
 
 def rules_from_line(line):
     tree = dict()
@@ -220,13 +207,13 @@ class PCFG(object):
 
         self.lexicon = [[rule.gsymb] + list(rule.expansion) for rule in self.count_rules]
         self.lexicon = set([symbol for rule in self.lexicon for symbol in rule])
-        self.terminals = set([gsymb for gsymb in self.lexicon if gsymb.isterminal()])
+        self.terminals = set([gsymb for gsymb in self.lexicon if gsymb.isterminal])
 
         # reverse the rules to be able to run CYK algorithm
         self.reverse_table = dict()
         for rule, log_proba in self.log_probabilities.items():
             if rule.expansion in self.reverse_table:
-                self.reversree_table[rule.expansion].append((rule, log_proba))
+                self.reverse_table[rule.expansion].append((rule, log_proba))
             else:
                 self.reverse_table[rule.expansion] = [(rule, log_proba)]
 
@@ -255,8 +242,8 @@ class PCFG(object):
 
                 for i, gsymb in enumerate(rule.expansion):
 
-                    if gsymb.isterminal():
-                        new_symb = Gsymbol("NT_" + gsymb.symb, "Non_Terminal")
+                    if gsymb.isterminal:
+                        new_symb = Gsymbol("NT_" + gsymb.symb, False)
                         new_rule = Grule(new_symb, [gsymb])
                         self.count_rules[new_rule] = 1
 
@@ -270,7 +257,7 @@ class PCFG(object):
                 while index > 1:
                     # New key is the concatenation of the two keys
                     new_key = modified_rule.expansion[index - 1].symb + "_" + modified_rule.expansion[index].symb
-                    new_symb = Gsymbol(new_key, Gsymbol.TYPES[1])
+                    new_symb = Gsymbol(new_key, False)
 
                     # Make new transition
                     new_rule = Grule(new_symb, [modified_rule.expansion[index - 1], modified_rule.expansion[index]])
